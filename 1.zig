@@ -1,16 +1,20 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
 
 pub fn main() !void {
+    std.debug.warn("{}\n", try freq(@embedFile("input/1")));
+}
+
+fn freq(input: []const u8) !i32 {
+    var it = std.mem.split(input, "\n");
     var sum: i32 = 0;
-
-    var line_buf: [20]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |line_len| {
-        const x = try fmt.parseInt(i32, line_buf[0..line_len], 10);
-        sum += x;
-    } else |err| {
+    while (it.next()) |line| {
+        sum += try std.fmt.parseInt(i32, line, 10);
     }
+    return sum;
+}
 
-    std.debug.warn("{}", sum);
+test "samples" {
+    std.debug.assert((try freq("+1\n+1\n+1\n")) == 3);
+    std.debug.assert((try freq("+1\n+1\n-2\n")) == 0);
+    std.debug.assert((try freq("-1\n-2\n-3\n")) == -6);
 }
