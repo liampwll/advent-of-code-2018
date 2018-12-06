@@ -1,59 +1,90 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
-const math = std.math;
 
-fn mDist(a: [2]i32, b: [2]i32) i32 {
-    return (math.absInt(a[0] - b[0]) catch unreachable)
-        + (math.absInt(a[1] - b[1]) catch unreachable);
-}
+const max_x = 500;
+const max_y = 500;
 
-const MAX_X = 500;
-const MAX_Y = 500;
+const Point = struct {
+    x: u32,
+    y: u32,
+    area: u32,
+    infinite: bool
+};
 
 pub fn main() !void {
-    var largest: i32 = 0;
-
     var direct_allocator = std.heap.DirectAllocator.init();
     defer direct_allocator.deinit();
 
-    var points = std.ArrayList([2]i32).init(&direct_allocator.allocator);
+    std.debug.warn("{}\n", try findLargest(&direct_allocator.allocator, @embedFile("input/6")));
+}
+
+fn mDist(a: Point, b: Point) !u32 {
+    return @intCast(u32, (try std.math.absInt(@intCast(i64, a.x) - @intCast(i64, b.x))))
+        + @intCast(u32, (try std.math.absInt(@intCast(i64, a.y) - @intCast(i64, b.y))));
+}
+
+fn findLargest(allocator: *std.mem.Allocator, input: []const u8) !u32 {
+    var points = std.ArrayList(Point).init(allocator);
     defer points.deinit();
 
-    var line_buf: [50]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |len| {
-        var iter = std.mem.split(line_buf[0..len], ", ");
-        const x = try fmt.parseInt(i32, iter.next().?, 10);
-        const y = try fmt.parseInt(i32, iter.next().?, 10);
-        _ = try points.append([]i32{x, y});
-    } else |err| {
+    var line_it = std.mem.split(input, "\n");
+    while (line_it.next()) |line| {
+        var num_it = std.mem.split(line, ", ");
+        const x = try std.fmt.parseInt(u32, num_it.next().?, 10);
+        const y = try std.fmt.parseInt(u32, num_it.next().?, 10);
+        _ = try points.append(Point{.x = x, .y = y, .area = 0, .infinite = false});
     }
 
-    outer: for (points.toSlice()) |*p| {
-        var area: i32 = 0;
-        var y: i32 = 0;
-        while (y <= MAX_Y) : (y += 1) {
-            var x: i32 = 0;
-            while (x <= MAX_X) : (x += 1) {
-                var closest = true;
-                for (points.toSlice()) |*p2| {
-                    if (p2 != p and mDist(p2.*, []i32{x, y}) <= mDist(p.*, []i32{x, y})) {
-                        closest = false;
-                        break;
-                    }
+    var y: u32 = 0;
+    while (y <= max_y) : (y += 1) {
+        var x: u32 = 0;
+        while (x <= max_x) : (x += 1) {
+            const p = Point{.x = x, .y = y, .area = 0, .infinite = false};
+            if (try closestPoint(p, points.toSlice())) |closest| {
+                if (x == 0 or y == 0 or x == max_x or y == max_y) {
+                    closest.infinite = true;
                 }
-                if (closest) {
-                    if (x == 0 or y == 0 or x == MAX_X or y == MAX_Y) {
-                        continue :outer;
-                    }
-                    area += 1;
-                }
+                closest.area += 1;
             }
         }
-        if (area > largest) {
-            largest = area;
+    }
+
+    var largest: u32 = 0;
+    for (points.toSliceConst()) |p| {
+        if (!p.infinite and p.area > largest) {
+            largest = p.area;
         }
     }
 
-    std.debug.warn("{}\n", largest);
+    return largest;
+}
+
+fn closestPoint(point: Point, others: []Point) !?*Point {
+    var closest = &others[0];
+    var closest_dist: u32 = try mDist(point, closest.*);
+    var conflict = false;
+
+    for (others[1..]) |*p| {
+        const dist = try mDist(point, p.*);
+        if (dist == closest_dist) {
+            conflict = true;
+        } if (dist < closest_dist) {
+            closest = p;
+            closest_dist = dist;
+            conflict = false;
+        }
+    }
+
+    return if (conflict) null else closest;
+}
+
+test "samples" {
+    const input =
+        \\1, 1
+        \\1, 6
+        \\8, 3
+        \\3, 4
+        \\5, 5
+        \\8, 9
+    ;
+    std.debug.assert((try findLargest(std.debug.global_allocator, input)) == 17);
 }

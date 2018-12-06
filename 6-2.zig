@@ -1,47 +1,65 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
-const math = std.math;
 
-fn mDist(a: [2]i32, b: [2]i32) i32 {
-    return (math.absInt(a[0] - b[0]) catch unreachable)
-        + (math.absInt(a[1] - b[1]) catch unreachable);
-}
+const max_x = 10000;
+const max_y = 10000;
+const safe = 10000;
 
-const SAFE = 10000;
+const Point = struct {
+    x: i32,
+    y: i32,
+};
 
 pub fn main() !void {
-    var area: i32 = 0;
-
     var direct_allocator = std.heap.DirectAllocator.init();
     defer direct_allocator.deinit();
 
-    var points = std.ArrayList([2]i32).init(&direct_allocator.allocator);
+    std.debug.warn("{}\n", try countSafe(&direct_allocator.allocator, @embedFile("input/6")));
+}
+
+fn mDist(a: Point, b: Point) !u32 {
+    return @intCast(u32, (try std.math.absInt(@intCast(i64, a.x) - @intCast(i64, b.x))))
+        + @intCast(u32, (try std.math.absInt(@intCast(i64, a.y) - @intCast(i64, b.y))));
+}
+
+fn countSafe(allocator: *std.mem.Allocator, input: []const u8) !u32 {
+    var points = std.ArrayList(Point).init(allocator);
     defer points.deinit();
 
-    var line_buf: [50]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |len| {
-        var iter = std.mem.split(line_buf[0..len], ", ");
-        const x = try fmt.parseInt(i32, iter.next().?, 10);
-        const y = try fmt.parseInt(i32, iter.next().?, 10);
-        _ = try points.append([]i32{x, y});
-    } else |err| {
+    var line_it = std.mem.split(input, "\n");
+    while (line_it.next()) |line| {
+        var num_it = std.mem.split(line, ", ");
+        const x = try std.fmt.parseInt(i32, num_it.next().?, 10);
+        const y = try std.fmt.parseInt(i32, num_it.next().?, 10);
+        _ = try points.append(Point{.x = x, .y = y});
     }
 
-    var y: i32 = -SAFE;
-    while (y <= SAFE) : (y += 1) {
-        var x: i32 = -SAFE;
-        while (x <= SAFE) : (x += 1) {
-            var sum: i32 = 0;
-            for (points.toSlice()) |*p| {
-                sum += mDist(p.*, []i32{x, y});
+    var area: u32 = 0;
+    var y: i32 = -max_y;
+    while (y <= max_y) : (y += 1) {
+        var x: i32 = -max_x;
+        while (x <= max_x) : (x += 1) {
+            const p = Point{.x = x, .y = y};
+            var sum: u32 = 0;
+            for (points.toSliceConst()) |p2| {
+                sum += try mDist(p, p2);
             }
-
-            if (sum < SAFE) {
+            if (sum < safe) {
                 area += 1;
             }
         }
     }
 
-    std.debug.warn("{}\n", area);
+    return area;
+}
+
+test "samples" {
+    const input =
+        \\1, 1
+        \\1, 6
+        \\8, 3
+        \\3, 4
+        \\5, 5
+        \\8, 9
+    ;
+    std.debug.assert((try countSafe(std.debug.global_allocator, input)) == 16);
 }
