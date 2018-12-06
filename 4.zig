@@ -1,81 +1,78 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
 
 const Guard = struct {
-     asleep: u32,
-    // awake: u32,
     sleep: [60]u32,
-};
 
-fn lexical(a: [50]u8, b: [50]u8) bool {
-    var i: usize = 0;
-    while (a[i] == b[i] and i < a.len) : (i += 1) {
+    pub fn totalSleep(self: Guard) u32 {
+        var total: u32 = 0;
+        for (self.sleep) |x| {
+            total += x;
+        }
+        return total;
     }
-    return a[i] <= b[i];
-}
+};
 
 pub fn main() !void {
     var direct_allocator = std.heap.DirectAllocator.init();
     defer direct_allocator.deinit();
 
-    var map = std.AutoHashMap(u32, Guard).init(&direct_allocator.allocator);
-    defer map.deinit();
+    std.debug.warn("{}\n", try sleepiest(&direct_allocator.allocator, @embedFile("input/4")));
+}
 
-    var lines = std.ArrayList([50]u8).init(&direct_allocator.allocator);
+fn sleepiest(allocator: *std.mem.Allocator, input: []const u8) !u32 {
+    var guards = std.AutoHashMap(u32, Guard).init(allocator);
+    defer guards.deinit();
+
+    var lines = std.ArrayList([]const u8).init(allocator);
     defer lines.deinit();
 
-    var guard: *Guard = undefined;
-    var last_hour: u32 = 0;
-    var last_minute: u32 = 0;
-    var asleep: bool = false;
-
-    var line_buf: [50]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |_| {
-        _ = try lines.append(line_buf);
-    } else |err| {
+    var line_it = std.mem.split(input, "\n");
+    while (line_it.next()) |line| {
+        _ = try lines.append(line);
     }
 
-    std.sort.sort([50]u8, lines.toSlice(), lexical);
+    std.sort.sort([]const u8, lines.toSlice(), lexical);
 
+    var current_guard: *Guard = undefined;
+    var last_hour: u32 = 0;
+    var last_minute: u32 = 0;
     for (lines.toSlice()) |line| {
-        var iter = std.mem.split(line[0..], "[]- :#");
-        const year = try fmt.parseInt(u32, iter.next().?, 10);
-        const month = try fmt.parseInt(u32, iter.next().?, 10);
-        const day = try fmt.parseInt(u32, iter.next().?, 10);
-        const hour = try fmt.parseInt(u32, iter.next().?, 10);
-        const minute = try fmt.parseInt(u32, iter.next().?, 10);
-        const action = iter.next().?;
-        if (std.mem.eql(u8, "Guard", action)) {
-            const id = try fmt.parseInt(u32, iter.next().?, 10);
-            if (!map.contains(id)) {
-                _ = try map.put(id, Guard{.asleep = 0, .sleep = []u32{0} ** 60});
-            }
-            guard = &map.get(id).?.value;
-            asleep = false;
-        } else {
-            if (asleep) {
+        var it = std.mem.split(line, "[]- :#");
+
+        const year = try std.fmt.parseInt(u32, it.next().?, 10);
+        const month = try std.fmt.parseInt(u32, it.next().?, 10);
+        const day = try std.fmt.parseInt(u32, it.next().?, 10);
+        const hour = try std.fmt.parseInt(u32, it.next().?, 10);
+        const minute = try std.fmt.parseInt(u32, it.next().?, 10);
+        const action = it.next().?;
+
+        switch (action[0]) {
+            'G' => { // "Guard"
+                const id = try std.fmt.parseInt(u32, it.next().?, 10);
+                if (!guards.contains(id)) {
+                    _ = try guards.put(id, Guard{.sleep = []u32{0} ** 60});
+                }
+                current_guard = &guards.get(id).?.value;
+            },
+            'w' => { // "wakes"
                 var i = last_minute;
                 while (i < minute) : (i += 1) {
-                    guard.asleep += 1;
-                    guard.sleep[i] += 1;
+                    current_guard.sleep[i] += 1;
                 }
-            }
-
-            if (std.mem.eql(u8, "wakes", action)) {
-                asleep = false;
-            } else {
-                asleep = true;
-            }
+            },
+            'f' => { // "falls"
+            },
+            else => unreachable
         }
+
         last_minute = minute;
         last_hour = hour;
     }
 
-    var it = map.iterator();
+    var it = guards.iterator();
     var sleepiest_guard = it.next().?;
     while (it.next()) |next| {
-        if (next.value.asleep > sleepiest_guard.value.asleep) {
+        if (next.value.totalSleep() > sleepiest_guard.value.totalSleep()) {
             sleepiest_guard = next;
         }
     }
@@ -87,5 +84,41 @@ pub fn main() !void {
         }
     }
 
-    std.debug.warn("{} {}\n", sleepiest_guard.key, sleepiest_minute);
+    return sleepiest_guard.key * @intCast(u32, sleepiest_minute);
+}
+
+fn lexical(a: []const u8, b: []const u8) bool {
+    var i: usize = 0;
+    while (a[i] == b[i] and i < a.len and i < b.len) : (i += 1) {
+    }
+    if (i == a.len) {
+        return true;
+    } else if (i == b.len) {
+        return false;
+    } else {
+        return a[i] <= b[i];
+    }
+}
+
+test "samples" {
+    const input =
+        \\[1518-11-01 00:00] Guard #10 begins shift
+        \\[1518-11-01 00:05] falls asleep
+        \\[1518-11-01 00:25] wakes up
+        \\[1518-11-01 00:30] falls asleep
+        \\[1518-11-01 00:55] wakes up
+        \\[1518-11-01 23:58] Guard #99 begins shift
+        \\[1518-11-02 00:40] falls asleep
+        \\[1518-11-02 00:50] wakes up
+        \\[1518-11-03 00:05] Guard #10 begins shift
+        \\[1518-11-03 00:24] falls asleep
+        \\[1518-11-03 00:29] wakes up
+        \\[1518-11-04 00:02] Guard #99 begins shift
+        \\[1518-11-04 00:36] falls asleep
+        \\[1518-11-04 00:46] wakes up
+        \\[1518-11-05 00:03] Guard #99 begins shift
+        \\[1518-11-05 00:45] falls asleep
+        \\[1518-11-05 00:55] wakes up
+    ;
+    std.debug.assert((try sleepiest(std.debug.global_allocator, input)) == 240);
 }
