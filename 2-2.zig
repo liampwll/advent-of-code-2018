@@ -1,11 +1,19 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
 
 const StrAndSum = struct {
-    str: [26]u8,
+    str: []const u8,
     sum: u64,
 };
+
+pub fn main() !void {
+    var direct_allocator = std.heap.DirectAllocator.init();
+    defer direct_allocator.deinit();
+
+    const result = try findCommon(&direct_allocator.allocator, @embedFile("input/2"));
+    defer direct_allocator.allocator.free(result);
+
+    std.debug.warn("{}\n", result);
+}
 
 fn cmpBySum(a: StrAndSum, b: StrAndSum) bool {
     return std.sort.asc(u64)(a.sum, b.sum);
@@ -19,42 +27,55 @@ fn strSum(str: []const u8) u64 {
     return sum;
 }
 
-fn check(a: []const u8, b: []const u8) bool {
-    var diff: usize = 0;
+fn diff(a: []const u8, b: []const u8) usize {
+    std.debug.assert(a.len == b.len);
+
+    var n: usize = 0;
     for (a) |x, i| {
-        diff += @boolToInt(x != b[i]);
+        n += @boolToInt(x != b[i]);
     }
-    return diff <= 1;
+    return n;
 }
 
-pub fn main() !void {
-    var direct_allocator = std.heap.DirectAllocator.init();
-    defer direct_allocator.deinit();
-
-    var list = std.ArrayList(StrAndSum).init(&direct_allocator.allocator);
+fn findCommon(allocator: *std.mem.Allocator, input: []const u8) ![]u8 {
+    var list = std.ArrayList(StrAndSum).init(allocator);
     defer list.deinit();
 
-    var line_buf: [26]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |_| {
-        _ = try list.append(StrAndSum{.str = line_buf, .sum = strSum(line_buf[0..])});
-    } else |err| {
+    var it = std.mem.split(input, "\n");
+    while (it.next()) |line| {
+        _ = try list.append(StrAndSum{.str = line, .sum = strSum(line)});
     }
 
     std.sort.sort(StrAndSum, list.toSlice(), cmpBySum);
 
     for (list.toSlice()) |x, i| {
         for (list.toSlice()[(i + 1)..]) |y| {
-            if (y.sum - x.sum > 26) {
-                break;
-            }
-            if (check(x.str[0..], y.str[0..])) {
-                for (x.str) |z, j| {
-                    if (z == y.str[j]) {
-                        std.debug.warn("{c}", z);
+            if (y.sum - x.sum <= 26 and diff(x.str, y.str) == 1) {
+                const result = try allocator.alloc(u8, x.str.len - 1);
+                var j: usize = 0;
+                for (x.str) |c, k| {
+                    if (c == y.str[k]) {
+                        result[j] = c;
+                        j += 1;
                     }
                 }
-                std.debug.warn("\n");
+                return result;
             }
         }
     }
+
+    unreachable;
+}
+
+test "samples" {
+    const input =
+        \\abcde
+        \\fghij
+        \\klmno
+        \\pqrst
+        \\fguij
+        \\axcye
+        \\wvxyz
+    ;
+    std.debug.assert(std.mem.eql(u8, try findCommon(std.debug.global_allocator, input), "fgij"));
 }

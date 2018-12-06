@@ -1,52 +1,39 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
 
-pub fn main() !void {
-    var direct_allocator = std.heap.DirectAllocator.init();
-    defer direct_allocator.deinit();
+pub fn main() void {
+    std.debug.warn("{}\n", checksum(@embedFile("input/2")));
+}
 
-    var count_map = std.AutoHashMap(u32, u32).init(&direct_allocator.allocator);
-    defer count_map.deinit();
+fn checksum(input: []const u8) u32 {
+    var twos: u32 = 0;
+    var threes: u32 = 0;
 
-    var line_buf: [100]u8 = undefined;
-    while (io.readLine(line_buf[0..])) |line_len| {
-        var char_map = std.AutoHashMap(u8, u32).init(&direct_allocator.allocator);
-        defer char_map.deinit();
-
-        for (line_buf[0..line_len]) |x| {
-            const count = try char_map.getOrPut(x);
-            if (count.found_existing == false) {
-                count.kv.value = 0;
-            }
-            count.kv.value += 1;
+    var it = std.mem.split(input, "\n");
+    while (it.next()) |line| {
+        var counts = []u32{0} ** 128;
+        for (line) |x| {
+            counts[x] += 1;
         }
-
-        var line_count_set = std.AutoHashMap(u32, void).init(&direct_allocator.allocator);
-        defer line_count_set.deinit();
-
-        var it = char_map.iterator();
-        while (it.next()) |x| {
-            if (!line_count_set.contains(x.value)) {
-                _ = try line_count_set.put(x.value, {});
-                const count = try count_map.getOrPut(x.value);
-                if (count.found_existing == false) {
-                    count.kv.value = 0;
-                }
-                count.kv.value += 1;
+        var got_two = false;
+        var got_three = false;
+        for (counts) |x, i| {
+            switch (x) {
+                2 => if (!got_two) {
+                    got_two = true;
+                    twos += 1;
+                },
+                3 => if (!got_three) {
+                    got_three = true;
+                    threes += 1;
+                },
+                else => {}
             }
         }
-    } else |err| {
     }
 
-    _ = count_map.remove(1);
+    return twos * threes;
+}
 
-    var product: u32 = 1;
-    var it = count_map.iterator();
-    while (it.next()) |x| {
-        std.debug.warn("{} {}\n", x.key, x.value);
-        product *= x.value;
-    }
-
-    std.debug.warn("{}", product);
+test "samples" {
+    std.debug.assert(checksum("abcdef\nbababc\nabbcde\nabcccd\naabcdd\nabcdee\nababab\n") == 12);
 }
