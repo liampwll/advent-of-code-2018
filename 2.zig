@@ -35,5 +35,13 @@ fn checksum(input: []const u8) u32 {
 }
 
 test "samples" {
-    std.debug.assert(checksum("abcdef\nbababc\nabbcde\nabcccd\naabcdd\nabcdee\nababab\n") == 12);
+    const input =
+        \\abcdef
+        \\bababc
+        \\abbcde
+        \\abcccd
+        \\aabcdd
+        \\abcdee
+        \\ababab
+    std.debug.assert(checksum(input) == 12);
 }
