@@ -1,61 +1,54 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
+
+pub fn main() !void {
+    var direct_allocator = std.heap.DirectAllocator.init();
+    defer direct_allocator.deinit();
+
+    std.debug.warn("{}\n", try react(&direct_allocator.allocator, @embedFile("input/5")));
+}
+
+fn react(allocator: *std.mem.Allocator, input: []const u8) !usize {
+    var shortest = input.len;
+
+    var letter: u8 = 'A';
+    while (letter < 'Z') : (letter += 1) {
+        var stack = std.ArrayList(u8).init(allocator);
+        defer stack.deinit();
+
+        for (input) |x| {
+            if (isAlpha(x) and toUpper(x) != letter) {
+                _ = try stack.append(x);
+            }
+            while (stack.count() >= 2 and canReact(stack.at(stack.count() - 1), stack.at(stack.count() - 2))) {
+                _ = stack.pop();
+                _ = stack.pop();
+            }
+        }
+
+        if (stack.count() < shortest) {
+            shortest = stack.count();
+        }
+    }
+
+    return shortest;
+}
+
+fn canReact(a: u8, b: u8) bool {
+    return toUpper(a) == toUpper(b) and a != b;
+}
 
 fn toUpper(x: u8) u8 {
-    if (x >= 'a' and 'z' >= x) {
+    if ('a' <= x and x <= 'z') {
         return x - ('a' - 'A');
     } else {
         return x;
     }
 }
 
-fn react(line: []u8) usize {
-    var len = line.len;
-    outer: while (true) {
-        for (line[0..(len - 1)]) |x, i| {
-            if (toUpper(x) == toUpper(line[i + 1]) and x != line[i + 1]) {
-                for (line[(i + 2)..len]) |y, j| {
-                    line[i + j] = y;
-                }
-                len -= 2;
-                continue :outer;
-            }
-        }
-        break;
-    }
-
-    return len;
+fn isAlpha(x: u8) bool {
+    return 'a' <= x and x <= 'z' or 'A' <= x and x <= 'Z';
 }
 
-fn removeLetter(line: []u8, letter: u8) usize {
-    var len = line.len;
-    var i: usize = 0;
-    while (i < len) : (i += 1) {
-        if (toUpper(line[i]) == toUpper(letter)) {
-            for (line[(i + 1)..len]) |x, j| {
-                line[i + j] = x;
-            }
-            len -= 1;
-            i -= 1;
-        }
-    }
-    return len;
-}
-
-pub fn main() !void {
-    var line: [50000]u8 = undefined;
-    _ = try io.readLine(line[0..]);
-    var shortest: usize = 50000;
-    var letter: u8 = 'a';
-    while (letter <= 'z') : (letter += 1) {
-        var line_copy: [50000]u8 = line;
-        var len = removeLetter(line_copy[0..], letter);
-        len = react(line_copy[0..len]);
-        if (len < shortest) {
-            shortest = len;
-        }
-    }
-
-    std.debug.warn("{}\n", shortest);
+test "samples" {
+    std.debug.assert((try react(std.debug.global_allocator, "dabAcCaCBAcCcaDA")) == 4);
 }

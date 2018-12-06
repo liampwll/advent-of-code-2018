@@ -1,31 +1,45 @@
 const std = @import("std");
-const io = std.io;
-const fmt = std.fmt;
+
+pub fn main() !void {
+    var direct_allocator = std.heap.DirectAllocator.init();
+    defer direct_allocator.deinit();
+
+    std.debug.warn("{}\n", try react(&direct_allocator.allocator, @embedFile("input/5")));
+}
+
+fn react(allocator: *std.mem.Allocator, input: []const u8) !usize {
+    var stack = std.ArrayList(u8).init(allocator);
+    defer stack.deinit();
+
+    for (input) |x| {
+        if (isAlpha(x)) {
+            _ = try stack.append(x);
+        }
+        while (stack.count() >= 2 and canReact(stack.at(stack.count() - 1), stack.at(stack.count() - 2))) {
+            _ = stack.pop();
+            _ = stack.pop();
+        }
+    }
+
+    return stack.count();
+}
+
+fn canReact(a: u8, b: u8) bool {
+    return toUpper(a) == toUpper(b) and a != b;
+}
 
 fn toUpper(x: u8) u8 {
-    if (x >= 'a' and 'z' >= x) {
+    if ('a' <= x and x <= 'z') {
         return x - ('a' - 'A');
     } else {
         return x;
     }
 }
 
-pub fn main() !void {
-    var len: usize = 50000;
-    var line: [50000]u8 = undefined;
-    _ = try io.readLine(line[0..]);
-    outer: while (true) {
-        for (line[0..(len - 1)]) |x, i| {
-            if (toUpper(x) == toUpper(line[i + 1]) and x != line[i + 1]) {
-                for (line[(i + 2)..len]) |y, j| {
-                    line[i + j] = y;
-                }
-                len -= 2;
-                continue :outer;
-            }
-        }
-        break;
-    }
+fn isAlpha(x: u8) bool {
+    return 'a' <= x and x <= 'z' or 'A' <= x and x <= 'Z';
+}
 
-    std.debug.warn("{}\n", len);
+test "samples" {
+    std.debug.assert((try react(std.debug.global_allocator, "dabAcCaCBAcCcaDA")) == 10);
 }
