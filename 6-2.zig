@@ -1,9 +1,5 @@
 const std = @import("std");
 
-const max_x = 10000;
-const max_y = 10000;
-const safe = 10000;
-
 const Point = struct {
     x: i32,
     y: i32,
@@ -13,7 +9,7 @@ pub fn main() !void {
     var direct_allocator = std.heap.DirectAllocator.init();
     defer direct_allocator.deinit();
 
-    std.debug.warn("{}\n", try countSafe(&direct_allocator.allocator, @embedFile("input/6")));
+    std.debug.warn("{}\n", try countSafe(&direct_allocator.allocator, @embedFile("input/6"), 10000));
 }
 
 fn mDist(a: Point, b: Point) !u32 {
@@ -21,7 +17,7 @@ fn mDist(a: Point, b: Point) !u32 {
         + @intCast(u32, (try std.math.absInt(@intCast(i64, a.y) - @intCast(i64, b.y))));
 }
 
-fn countSafe(allocator: *std.mem.Allocator, input: []const u8) !u32 {
+fn countSafe(allocator: *std.mem.Allocator, input: []const u8, safe: u32) !u32 {
     var points = std.ArrayList(Point).init(allocator);
     defer points.deinit();
 
@@ -34,10 +30,10 @@ fn countSafe(allocator: *std.mem.Allocator, input: []const u8) !u32 {
     }
 
     var area: u32 = 0;
-    var y: i32 = -max_y;
-    while (y <= max_y) : (y += 1) {
-        var x: i32 = -max_x;
-        while (x <= max_x) : (x += 1) {
+    var y: i32 = -@intCast(i32, safe);
+    while (y <= @intCast(i32, safe)) : (y += 1) {
+        var x: i32 = -@intCast(i32, safe);
+        while (x <= @intCast(i32, safe)) : (x += 1) {
             const p = Point{.x = x, .y = y};
             var sum: u32 = 0;
             for (points.toSliceConst()) |p2| {
@@ -61,5 +57,5 @@ test "samples" {
         \\5, 5
         \\8, 9
     ;
-    std.debug.assert((try countSafe(std.debug.global_allocator, input)) == 16);
+    std.debug.assert((try countSafe(std.debug.global_allocator, input, 32)) == 16);
 }
