@@ -43,5 +43,6 @@ test "samples" {
         \\aabcdd
         \\abcdee
         \\ababab
+    ;
     std.debug.assert(checksum(input) == 12);
 }
