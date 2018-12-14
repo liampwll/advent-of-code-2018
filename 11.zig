@@ -37,3 +37,8 @@ fn power(x: i32, y: i32, serial: i32) i32 {
     const id = x + 10;
     return @rem(@divTrunc((id * y + serial) * id, 100), 10) - 5;
 }
+
+test "samples" {
+    std.debug.assert(std.mem.eql(i32, maxPower(18), []i32{33, 45}));
+    std.debug.assert(std.mem.eql(i32, maxPower(42), []i32{21, 61}));
+}
