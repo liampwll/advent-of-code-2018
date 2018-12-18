@@ -44,37 +44,21 @@ fn water(input: []const u8) !usize {
         }
     }
 
-    var res = down(table[0..(max_y + 1)], 0, 500);
+    var res = spreadDown(table[0..(max_y + 1)], 0, 500);
 
-    var i: u32 = 0;
-    while (i < 10) : (i += 1) {
-        for (table[0..(max_y + 1)]) |*line, y| {
-            for (line) |*tile, x| {
-                if (tile.* == TileType.Water and can_drain(table[0..(max_y + 1)], y, x)) {
-                    tile.* = TileType.Sand;
-                    res -= 1;
-                }
+    for (table[0..(max_y + 1)]) |*line, y| {
+        for (line) |*tile, x| {
+            if (tile.* == TileType.Water and canDrain(table[0..(max_y + 1)], y, x)) {
+                tile.* = TileType.Sand;
+                res -= 1;
             }
         }
-    }
-
-    for (table[0..(max_y + 2)]) |line| {
-        for (line[420..580]) |x| {
-            if (x == TileType.Sand) {
-                std.debug.warn(".");
-            } else if (x == TileType.Clay) {
-                std.debug.warn("#");
-            } else if (x == TileType.Water) {
-                std.debug.warn("~");
-            }
-        }
-        std.debug.warn("\n");
     }
 
     return res;
 }
 
-fn can_drain(table: [][2000]TileType, y: usize, x: usize) bool {
+fn canDrain(table: [][2000]TileType, y: usize, x: usize) bool {
     var i = x;
     const can_go_left = while (true) : (i -= 1) {
         if (table[y][i] == TileType.Sand) {
@@ -98,26 +82,26 @@ fn can_drain(table: [][2000]TileType, y: usize, x: usize) bool {
     return can_go_left or can_go_right;
 }
 
-fn down(table: [][2000]TileType, y: usize, x: usize) usize {
-    if (y == table.len) {
+// Unlike spreadLeft and spreadRight this function sets table[y][x] to
+// TileType.Water.
+fn spreadDown(table: [][2000]TileType, y: usize, x: usize) usize {
+    if (y == table.len or table[y][x] != TileType.Sand) {
         return 0;
     }
 
-    switch (table[y][x]) {
-        TileType.Sand => {
-            table[y][x] = TileType.Water;
-            return 1 + down(table, y + 1, x) + left(table, y, x) + right(table, y, x);
-        },
-        TileType.Clay => {
-            return 0;
-        },
-        TileType.Water => {
-            return 0;
-        }
+    table[y][x] = TileType.Water;
+
+    const count = 1 + spreadDown(table, y + 1, x);
+    if (canSpread(table, y, x)) {
+        return count + spreadLeft(table, y, x) + spreadRight(table, y, x);
+    } else {
+        return count;
     }
 }
 
-fn can_spread(table: [][2000]TileType, y: usize, x: usize) bool {
+// Checks if the water should spread out to the left and right from a position.
+fn canSpread(table: [][2000]TileType, y: usize, x: usize) bool {
+    // When the water reaches the bottom level we assume it continues to fall.
     if (y + 1 == table.len) {
         return false;
     }
@@ -149,35 +133,27 @@ fn can_spread(table: [][2000]TileType, y: usize, x: usize) bool {
     return can_go_left and can_go_right;
 }
 
-fn left(table: [][2000]TileType, y: usize, x: usize) usize {
-    if (!can_spread(table, y, x)) {
-        return 0;
-    }
-
+fn spreadLeft(table: [][2000]TileType, y: usize, x: usize) usize {
     var i = x - 1;
     while (table[y + 1][i] != TileType.Sand and table[y][i] == TileType.Sand) : (i -= 1) {
         table[y][i] = TileType.Water;
     }
 
     if (table[y][i] == TileType.Sand) {
-        return down(table, y, i) + ((x - 1) - i);
+        return spreadDown(table, y, i) + ((x - 1) - i);
     } else {
         return (x - 1) - i;
     }
 }
 
-fn right(table: [][2000]TileType, y: usize, x: usize) usize {
-    if (!can_spread(table, y, x)) {
-        return 0;
-    }
-
+fn spreadRight(table: [][2000]TileType, y: usize, x: usize) usize {
     var i = x + 1;
     while (table[y + 1][i] != TileType.Sand and table[y][i] == TileType.Sand) : (i += 1) {
         table[y][i] = TileType.Water;
     }
 
     if (table[y][i] == TileType.Sand) {
-        return down(table, y, i) + (i - (x + 1));
+        return spreadDown(table, y, i) + (i - (x + 1));
     } else {
         return i - (x + 1);
     }
